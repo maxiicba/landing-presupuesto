@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Propuesta de Desarrollo: Sistema de Intermediación y Fletes</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Tech Dark Mode (Deep Blue-Gray, Vibrant Indigo/Emerald Accents) -->
+    <!-- Application Structure Plan: Se ha diseñado una SPA de una sola página con desplazamiento vertical y navegación por pestañas para guiar al cliente a través de la propuesta. La estructura es: 1) Resumen Ejecutivo con KPIs (costo y tiempo) para impacto inmediato. 2) Desglose Interactivo del Presupuesto con un gráfico de dona para visualizar la distribución de costos. 3) Fases del Proyecto como una línea de tiempo vertical interactiva para clarificar el proceso. 4) Alcance del Proyecto con listas claras de 'Incluye' y 'No Incluye', incluyendo observaciones importantes resaltadas. 5) Hitos de Pago para transparentar el flujo financiero, mostrando montos en USD y ARS. 6) Contacto. Se ha añadido un selector de moneda (USD/ARS) en la navegación para una mayor flexibilidad y transparencia. -->
+    <!-- Visualization & Content Choices: 1. Presupuesto Total -> Goal: Informar -> Viz: Gráfico de Dona (Chart.js) -> Interaction: Hover sobre segmentos para resaltar detalles y selector de moneda para cambiar la visualización (USD/ARS) -> Justification: Muestra proporciones de costo (Desarrollo vs QA) de forma visualmente atractiva y permite al usuario elegir la moneda de su preferencia. 2. Ciclo de Desarrollo -> Goal: Organizar/Change -> Viz: Línea de tiempo vertical (HTML/CSS/JS) -> Interaction: Clic para expandir detalles de cada fase -> Justification: Presenta el proceso de forma secuencial y limpia, evitando sobrecargar al usuario con información. 3. Hitos de Pago -> Goal: Informar -> Viz: Tarjetas de 3 columnas (HTML/Tailwind) -> Interaction: Hover sutil y selector de moneda para cambiar la visualización (USD/ARS) -> Justification: Divide el compromiso financiero en pasos claros y manejables ligados a entregables, con flexibilidad de moneda. 4. Alcance -> Goal: Comparar -> Viz: Listas con íconos (HTML/Tailwind) y bloque de texto resaltado para observaciones importantes -> Justification: Delimita claramente las responsabilidades con una fuerte señalización visual (check/cross) y asegura la visibilidad de las condiciones clave del presupuesto. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #1A202C; /* Darker background */
+            color: #E2E8F0; /* Lighter text for contrast */
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 400px;
+            height: auto;
+            min-height: 300px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                min-height: 350px;
+            }
+        }
+        .tab-active {
+            background-color: #6366F1; /* Vibrant indigo */
+            color: #FFFFFF;
+            font-weight: 600;
+        }
+        .tab-inactive {
+            background-color: #374151; /* Dark gray for inactive tabs */
+            color: #D1D5DB;
+        }
+        .phase-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.5s ease-out;
+        }
+        /* Custom animations */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in {
+            animation: fadeIn 0.8s ease-out forwards;
+            opacity: 0; /* Hidden by default */
+        }
+        .animate-delay-100 { animation-delay: 0.1s; }
+        .animate-delay-200 { animation-delay: 0.2s; }
+        .animate-delay-300 { animation-delay: 0.3s; }
+        .animate-delay-400 { animation-delay: 0.4s; }
+        .animate-delay-500 { animation-delay: 0.5s; }
+    </style>
+</head>
+<body class="antialiased">
+
+    <header class="bg-gray-900 shadow-xl sticky top-0 z-50 animate-fade-in">
+        <nav class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center">
+                    <span class="font-bold text-xl text-blue-400">MaxSoftware</span>
+                </div>
+                <div class="hidden md:flex items-center space-x-4">
+                    <div class="ml-10 flex items-baseline space-x-4">
+                        <a href="#resumen" class="nav-link text-gray-400 hover:text-blue-400 px-3 py-2 rounded-md text-sm font-medium transition-colors duration-300">Resumen</a>
+                        <a href="#presupuesto" class="nav-link text-gray-400 hover:text-blue-400 px-3 py-2 rounded-md text-sm font-medium transition-colors duration-300">Presupuesto</a>
+                        <a href="#fases" class="nav-link text-gray-400 hover:text-blue-400 px-3 py-2 rounded-md text-sm font-medium transition-colors duration-300">Fases</a>
+                        <a href="#alcance" class="nav-link text-gray-400 hover:text-blue-400 px-3 py-2 rounded-md text-sm font-medium transition-colors duration-300">Alcance</a>
+                        <a href="#pagos" class="nav-link text-gray-400 hover:text-blue-400 px-3 py-2 rounded-md text-sm font-medium transition-colors duration-300">Pagos</a>
+                        <a href="#contacto" class="nav-link text-gray-400 hover:text-blue-400 px-3 py-2 rounded-md text-sm font-medium transition-colors duration-300">Contacto</a>
+                    </div>
+                    <button id="currencyToggle" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-md transition-colors duration-300">Ver en ARS</button>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <main class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
+
+        <!-- Section: Resumen -->
+        <section id="resumen" class="text-center pt-8 pb-12">
+            <h1 class="text-4xl md:text-5xl font-bold text-white leading-tight animate-fade-in">Propuesta de Desarrollo</h1>
+            <p class="mt-4 text-xl text-indigo-400 font-semibold animate-fade-in animate-delay-100">Sistema de Intermediación y Fletes (Transporte Rodriguez)</p>
+            <div class="mt-10 grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+                <div class="bg-gray-800 p-8 rounded-2xl shadow-xl border border-gray-700 animate-fade-in animate-delay-200">
+                    <h3 class="text-lg font-medium text-gray-400">Inversión Total Estimada</h3>
+                    <p id="total-investment-value" class="mt-2 text-4xl font-bold text-white">USD $10.236</p>
+                    <p id="total-investment-note" class="text-sm text-gray-500">(ARS $13.000.000, aprox. 1 USD = 1270 ARS)</p>
+                </div>
+                <div class="bg-gray-800 p-8 rounded-2xl shadow-xl border border-gray-700 animate-fade-in animate-delay-300">
+                    <h3 class="text-lg font-medium text-gray-400">Plazo de Entrega Estimado</h3>
+                    <p class="mt-2 text-4xl font-bold text-white">4-5 Meses</p>
+                </div>
+            </div>
+            <p class="mt-8 max-w-3xl mx-auto text-lg text-gray-400 animate-fade-in animate-delay-400">Esta propuesta detalla el desarrollo de una solución de software completa, diseñada para ser confiable, escalable y eficiente, impulsando la gestión y automatización de su negocio.</p>
+        </section>
+
+        <!-- Section: Presupuesto -->
+        <section id="presupuesto" class="pt-16 pb-12">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl font-bold text-white animate-fade-in">Desglose del Presupuesto</h2>
+                <p class="mt-4 max-w-2xl mx-auto text-lg text-gray-400 animate-fade-in animate-delay-100">Para asegurar total transparencia, aquí detallamos cómo se compone la inversión. Puede interactuar con el gráfico para ver los detalles de cada componente del costo del proyecto.</p>
+            </div>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+                <div class="bg-gray-800 p-6 md:p-8 rounded-2xl shadow-xl border border-gray-700 flex flex-col justify-center animate-fade-in animate-delay-200">
+                     <div class="chart-container">
+                        <canvas id="budgetChart"></canvas>
+                    </div>
+                </div>
+                <div id="budgetDetails" class="space-y-6">
+                    <div id="dev-card" class="bg-gray-800 p-6 rounded-2xl shadow-md border border-gray-700 transition-all duration-300 animate-fade-in animate-delay-300">
+                        <h3 class="text-xl font-semibold text-indigo-400">Desarrollo Fullstack</h3>
+                        <p class="text-gray-400 mt-1">Backend, Frontend, DB, Integraciones y más.</p>
+                        <div class="mt-4 grid grid-cols-2 gap-4 text-center">
+                            <div>
+                                <p class="text-sm text-gray-400">Horas</p>
+                                <p class="text-2xl font-bold text-white">500</p>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-400">Valor/Hora</p>
+                                <p id="dev-hourly-value" class="text-2xl font-bold text-white">USD $19.06</p>
+                            </div>
+                        </div>
+                        <div class="mt-4 pt-4 border-t border-gray-700">
+                            <p class="text-sm text-gray-400 text-center">Subtotal Desarrollo</p>
+                            <p id="dev-subtotal-value" class="text-3xl font-bold text-center text-white">USD $9.528</p>
+                        </div>
+                    </div>
+                    <div id="qa-card" class="bg-gray-800 p-6 rounded-2xl shadow-md border border-gray-700 transition-all duration-300 animate-fade-in animate-delay-400">
+                        <h3 class="text-xl font-semibold text-emerald-400">Testing Profesional (QA)</h3>
+                        <p class="text-gray-400 mt-1">Aseguramiento de la calidad por un equipo externo.</p>
+                        <div class="mt-4 grid grid-cols-2 gap-4 text-center">
+                            <div>
+                                <p class="text-sm text-gray-400">Horas</p>
+                                <p class="text-2xl font-bold text-white">50</p>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-400">Valor/Hora</p>
+                                <p id="qa-hourly-value" class="text-2xl font-bold text-white">USD $14.17</p>
+                            </div>
+                        </div>
+                        <div class="mt-4 pt-4 border-t border-gray-700">
+                            <p class="text-sm text-gray-400 text-center">Subtotal Testing</p>
+                            <p id="qa-subtotal-value" class="text-3xl font-bold text-center text-white">USD $709</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section: Fases -->
+        <section id="fases" class="pt-16 pb-12">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl font-bold text-white animate-fade-in">Nuestro Proceso: Fases del Proyecto</h2>
+                <p class="mt-4 max-w-2xl mx-auto text-lg text-gray-400 animate-fade-in animate-delay-100">Trabajamos con una metodología ágil para entregar valor de forma continua. Haga clic en cada fase para ver los detalles de nuestro proceso y cómo colaboraremos para construir su sistema.</p>
+            </div>
+            <div class="max-w-3xl mx-auto">
+                <div class="relative">
+                    <div class="absolute left-1/2 -ml-px w-0.5 h-full bg-indigo-600" aria-hidden="true"></div>
+                    <div class="space-y-12">
+                        <!-- Phase 1 -->
+                        <div class="phase-item animate-fade-in animate-delay-200">
+                            <div class="phase-trigger flex items-center cursor-pointer hover:scale-[1.01] transition-transform duration-200">
+                                <div class="flex-shrink-0 w-12 h-12 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-lg z-10 shadow-lg">1</div>
+                                <h3 class="ml-6 text-xl font-semibold text-white">Planificación y Setup Inicial</h3>
+                            </div>
+                            <div class="phase-content ml-6 pl-14 mt-2">
+                                <div class="bg-gray-700 p-4 rounded-lg border border-gray-600">
+                                    <ul class="list-disc list-inside text-gray-300 space-y-2">
+                                        <li>Definición detallada de requisitos y funcionalidades.</li>
+                                        <li>Diseño y modelado completo de la base de datos (Postgres).</li>
+                                        <li>Configuración del entorno y arquitecturas (NestJS, Angular).</li>
+                                        <li class="font-semibold">Entrega: Version pre-eliminar visual del sistema.</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Phase 2 -->
+                        <div class="phase-item animate-fade-in animate-delay-300">
+                            <div class="phase-trigger flex items-center cursor-pointer hover:scale-[1.01] transition-transform duration-200">
+                                <div class="flex-shrink-0 w-12 h-12 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-lg z-10 shadow-lg">2</div>
+                                <h3 class="ml-6 text-xl font-semibold text-white">Desarrollo Iterativo (Sprints)</h3>
+                            </div>
+                            <div class="phase-content ml-6 pl-14 mt-2">
+                                <div class="bg-gray-700 p-4 rounded-lg border border-gray-600">
+                                    <ul class="list-disc list-inside text-gray-300 space-y-2">
+                                        <li>Implementación de backend y frontend.</li>
+                                        <li>Desarrollo de módulos clave: Intermediación y Fletes.</li>
+                                        <li>Integraciones esenciales como notificaciones por WhatsApp.</li>
+                                        <li class="font-semibold">Entrega: Avances funcionales semanales para revisión.</li>
+                                        <li class="font-semibold">Hito: Entrega de MVP de Intermediación.</li>
+                                     </ul>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Phase 3 -->
+                        <div class="phase-item animate-fade-in animate-delay-400">
+                            <div class="phase-trigger flex items-center cursor-pointer hover:scale-[1.01] transition-transform duration-200">
+                                <div class="flex-shrink-0 w-12 h-12 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-lg z-10 shadow-lg">3</div>
+                                <h3 class="ml-6 text-xl font-semibold text-white">Testing Continuo y QA</h3>
+                            </div>
+                            <div class="phase-content ml-6 pl-14 mt-2">
+                                <div class="bg-gray-700 p-4 rounded-lg border border-gray-600">
+                                    <ul class="list-disc list-inside text-gray-300 space-y-2">
+                                        <li>Testing interno durante todo el desarrollo.</li>
+                                        <li>Testing profesional por equipo de QA externo.</li>
+                                        <li>Identificación, reporte y corrección de errores.</li>
+                                        <li class="font-semibold">Entrega: Un sistema robusto y validado.</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Phase 4 -->
+                         <div class="phase-item animate-fade-in animate-delay-500">
+                            <div class="phase-trigger flex items-center cursor-pointer hover:scale-[1.01] transition-transform duration-200">
+                                <div class="flex-shrink-0 w-12 h-12 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-lg z-10 shadow-lg">4</div>
+                                <h3 class="ml-6 text-xl font-semibold text-white">Despliegue y Producción</h3>
+                            </div>
+                            <div class="phase-content ml-6 pl-14 mt-2">
+                                <div class="bg-gray-700 p-4 rounded-lg border border-gray-600">
+                                    <ul class="list-disc list-inside text-gray-300 space-y-2">
+                                        <li>Configuración y deploy en servidor productivo.</li>
+                                        <li>Aseguramiento de estabilidad y rendimiento en entorno real.</li>
+                                        <li class="font-semibold">Entrega: Sistema online y funcionando.</li>
+                                     </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- Section: Alcance -->
+        <section id="alcance" class="pt-16 pb-12">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl font-bold text-white animate-fade-in">Alcance del Proyecto</h2>
+                <p class="mt-4 max-w-2xl mx-auto text-lg text-gray-400 animate-fade-in animate-delay-100">Es fundamental definir claramente qué incluye y qué no incluye el proyecto para alinear expectativas. Esta sección detalla los entregables y los límites de esta propuesta.</p>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+                <div class="bg-emerald-900 border-l-4 border-emerald-600 p-6 rounded-r-lg animate-fade-in animate-delay-200">
+                    <h3 class="text-2xl font-semibold text-emerald-300 flex items-center">
+                        <span class="text-3xl mr-3">✔️</span> Incluye
+                    </h3>
+                    <ul class="mt-4 space-y-3 text-emerald-200">
+                        <li>Diseño y modelado de base de datos (Postgres)</li>
+                        <li>Backend robusto con NestJS y TypeORM</li>
+                        <li>Frontend dinámico con Angular</li>
+                        <li>Integración de notificaciones con WhatsApp</li>
+                        <li>Módulo completo de Intermediación</li>
+                        <li>Módulo dedicado de Fletes</li>
+                        <li>Testing profesional por equipo de QA</li>
+                        <li>Deploy en servidor productivo</li>
+                    </ul>
+                </div>
+                 <div class="bg-red-900 border-l-4 border-red-600 p-6 rounded-r-lg animate-fade-in animate-delay-300">
+                    <h3 class="text-2xl font-semibold text-red-300 flex items-center">
+                        <span class="text-3xl mr-3">❌</span> No Incluye
+                    </h3>
+                    <ul class="mt-4 space-y-3 text-red-200">
+                        <li>Licencias de software o APIs (ej. WhatsApp Business)</li>
+                        <li>Costos de infraestructura (servidor, dominio)</li>
+                        <li>Mantenimiento mensual post-producción</li>
+                        <li>Cambios de alcance no definidos inicialmente</li>
+                    </ul>
+                    <div class="mt-8 pt-6 border-t border-red-700 bg-gray-800 p-4 rounded-lg shadow-inner border border-red-500">
+                        <h4 class="text-xl font-semibold text-red-300 mb-3">Observaciones Importantes</h4>
+                        <ul class="list-disc list-inside text-gray-300 space-y-2">
+                            <li>Este presupuesto es cerrado sobre el alcance actual.</li>
+                            <li>Cambios en requerimientos serán cotizados como adicionales.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section: Pagos -->
+        <section id="pagos" class="pt-16 pb-12">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl font-bold text-white animate-fade-in">Hitos de Pago Sugeridos</h2>
+                <p class="mt-4 max-w-2xl mx-auto text-lg text-gray-400 animate-fade-in animate-delay-100">Proponemos un esquema de pagos alineado con el progreso y los entregables del proyecto, facilitando una inversión escalonada y segura a medida que avanzamos juntos.</p>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+                <div class="bg-gray-800 p-8 rounded-2xl shadow-xl border border-gray-700 text-center animate-fade-in animate-delay-200 hover:scale-[1.02] transition-transform duration-300">
+                    <div class="text-indigo-400 text-4xl font-bold mb-4">30%</div>
+                    <h3 class="text-xl font-semibold text-white">Al Iniciar</h3>
+                    <p class="mt-2 text-gray-400">Cubre la planificación detallada y la configuración técnica inicial del proyecto.</p>
+                    <p id="payment-30-value" class="mt-2 text-lg font-bold text-white">USD $3.071</p>
+                    <p id="payment-30-note" class="text-sm text-gray-500">(ARS $3.900.000)</p>
+                </div>
+                <div class="bg-gray-800 p-8 rounded-2xl shadow-xl border border-gray-700 text-center animate-fade-in animate-delay-300 hover:scale-[1.02] transition-transform duration-300">
+                     <div class="text-indigo-400 text-4xl font-bold mb-4">40%</div>
+                    <h3 class="text-xl font-semibold text-white">Entrega del MVP</h3>
+                    <p class="mt-2 text-gray-400">Con la entrega del primer producto viable del módulo de intermediación.</p>
+                    <p id="payment-40-value" class="mt-2 text-lg font-bold text-white">USD $4.094</p>
+                    <p id="payment-40-note" class="text-sm text-gray-500">(ARS $5.200.000)</p>
+                </div>
+                <div class="bg-gray-800 p-8 rounded-2xl shadow-xl border border-gray-700 text-center animate-fade-in animate-delay-400 hover:scale-[1.02] transition-transform duration-300">
+                     <div class="text-indigo-400 text-4xl font-bold mb-4">30%</div>
+                    <h3 class="text-xl font-semibold text-white">Entrega Final</h3>
+                    <p class="mt-2 text-gray-400">Al entregar el sistema completo, con el testing final aprobado y en producción.</p>
+                    <p id="payment-final-value" class="mt-2 text-lg font-bold text-white">USD $3.071</p>
+                    <p id="payment-final-note" class="text-sm text-gray-500">(ARS $3.900.000)</p>
+                </div>
+            </div>
+        </section>
+
+    </main>
+    
+    <footer id="contacto" class="bg-gray-900 text-white animate-fade-in animate-delay-500">
+        <div class="max-w-6xl mx-auto py-12 px-4 sm:px-6 lg:px-8 text-center">
+            <h2 class="text-2xl font-bold text-blue-400">MaxSoftware</h2>
+            <p class="mt-2 text-gray-300">Desarrollo de software de gestión y automatización.</p>
+            <p class="mt-1 text-gray-300">Soluciones confiables, escalables y eficientes.</p>
+            <div class="mt-6 flex justify-center items-center space-x-6">
+                <a href="mailto:contacto@maxsoftware.com.ar" class="text-gray-300 hover:text-blue-400 transition-colors duration-300">contacto@maxsoftware.com.ar</a>
+                <span>&bull;</span>
+                <a href="http://www.maxsoftware.com.ar" target="_blank" class="text-gray-300 hover:text-blue-400 transition-colors duration-300">www.maxsoftware.com.ar</a>
+            </div>
+            <p class="mt-8 text-sm text-gray-500">&copy; 2025 MaxSoftware. Todos los derechos reservados.</p>
+        </div>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            // Original ARS values
+            const originalArsValues = {
+                total: 13000000,
+                devHourly: 24200,
+                devSubtotal: 12100000,
+                qaHourly: 18000,
+                qaSubtotal: 900000,
+                payment30: 3900000,
+                payment40: 5200000
+            };
+
+            const ARS_TO_USD_RATE = 1270;
+            let currentCurrency = 'USD'; // Default currency
+
+            function formatCurrency(amount, targetCurrency) {
+                if (targetCurrency === 'USD') {
+                    // Ensure proper formatting for USD with 0 decimal places
+                    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount / ARS_TO_USD_RATE);
+                } else { // targetCurrency === 'ARS'
+                    // Ensure proper formatting for ARS with 0 decimal places
+                    return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount);
+                }
+            }
+
+            function updateCurrencyDisplay() {
+                // Update Resumen
+                document.getElementById('total-investment-value').textContent = formatCurrency(originalArsValues.total, currentCurrency);
+                if (currentCurrency === 'USD') {
+                    document.getElementById('total-investment-note').textContent = `(ARS ${new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(originalArsValues.total)}, aprox. 1 USD = ${ARS_TO_USD_RATE} ARS)`;
+                } else { // currentCurrency === 'ARS'
+                    document.getElementById('total-investment-note').textContent = `(aprox. 1 USD = ${ARS_TO_USD_RATE} ARS)`;
+                }
+
+                // Update Presupuesto
+                document.getElementById('dev-hourly-value').textContent = formatCurrency(originalArsValues.devHourly, currentCurrency);
+                document.getElementById('dev-subtotal-value').textContent = formatCurrency(originalArsValues.devSubtotal, currentCurrency);
+                document.getElementById('qa-hourly-value').textContent = formatCurrency(originalArsValues.qaHourly, currentCurrency);
+                document.getElementById('qa-subtotal-value').textContent = formatCurrency(originalArsValues.qaSubtotal, currentCurrency);
+
+                // Update Chart
+                const chart = Chart.getChart('budgetChart');
+                if (chart) {
+                    // Chart data always uses original ARS values, tooltip handles conversion
+                    chart.data.datasets[0].data = [
+                        originalArsValues.devSubtotal,
+                        originalArsValues.qaSubtotal
+                    ];
+                    chart.options.plugins.tooltip.callbacks.label = function(context) {
+                        let label = context.label || '';
+                        if (label) {
+                            label += ': ';
+                        }
+                        if (context.parsed !== null) {
+                            label += formatCurrency(context.parsed, currentCurrency);
+                        }
+                        return label;
+                    };
+                    chart.update();
+                }
+
+                // Update Pagos
+                document.getElementById('payment-30-value').textContent = formatCurrency(originalArsValues.payment30, currentCurrency);
+                if (currentCurrency === 'USD') {
+                    document.getElementById('payment-30-note').textContent = `(ARS ${new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(originalArsValues.payment30)})`;
+                } else {
+                    document.getElementById('payment-30-note').textContent = '';
+                }
+
+                document.getElementById('payment-40-value').textContent = formatCurrency(originalArsValues.payment40, currentCurrency);
+                if (currentCurrency === 'USD') {
+                    document.getElementById('payment-40-note').textContent = `(ARS ${new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(originalArsValues.payment40)})`;
+                } else {
+                    document.getElementById('payment-40-note').textContent = '';
+                }
+
+                document.getElementById('payment-final-value').textContent = formatCurrency(originalArsValues.payment30, currentCurrency);
+                if (currentCurrency === 'USD') {
+                    document.getElementById('payment-final-note').textContent = `(ARS ${new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(originalArsValues.payment30)})`;
+                } else {
+                    document.getElementById('payment-final-note').textContent = '';
+                }
+
+
+                // Update toggle button text
+                const currencyToggleButton = document.getElementById('currencyToggle');
+                if (currentCurrency === 'USD') {
+                    currencyToggleButton.textContent = 'Ver en ARS';
+                } else {
+                    currencyToggleButton.textContent = 'Ver en USD';
+                }
+            }
+
+            // Initial Chart Setup (always with ARS data, tooltip handles conversion)
+            const budgetData = {
+                labels: ['Desarrollo Fullstack', 'Testing Profesional (QA)'],
+                datasets: [{
+                    data: [originalArsValues.devSubtotal, originalArsValues.qaSubtotal],
+                    backgroundColor: ['#6366F1', '#10B981'], /* Indigo and Emerald */
+                    borderColor: '#1A202C', /* Body background color */
+                    borderWidth: 4,
+                    hoverBackgroundColor: ['#4F46E5', '#059669'], /* Darker shades for hover */
+                    hoverOffset: 8
+                }]
+            };
+
+            const budgetConfig = {
+                type: 'doughnut',
+                data: budgetData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '70%',
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                padding: 20,
+                                color: '#E2E8F0', /* Lighter legend text */
+                                font: {
+                                    size: 14,
+                                    family: 'Inter'
+                                }
+                            }
+                        },
+                        tooltip: {
+                            enabled: true,
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    if (context.parsed !== null) {
+                                        label += formatCurrency(context.parsed, currentCurrency);
+                                    }
+                                    return label;
+                                }
+                            },
+                            backgroundColor: '#374151', /* Darker tooltip background */
+                            titleColor: '#E2E8F0',
+                            bodyColor: '#E2E8F0',
+                            borderColor: '#4B5563',
+                            borderWidth: 1
+                        }
+                    },
+                    onHover: (event, chartElement) => {
+                        const devCard = document.getElementById('dev-card');
+                        const qaCard = document.getElementById('qa-card');
+                        
+                        devCard.style.transform = 'scale(1)';
+                        devCard.style.boxShadow = '';
+                        qaCard.style.transform = 'scale(1)';
+                        qaCard.style.boxShadow = '';
+
+                        if (chartElement.length) {
+                            const index = chartElement[0].index;
+                            if (index === 0) {
+                                devCard.style.transform = 'scale(1.03)';
+                                devCard.style.boxShadow = '0 10px 15px -3px rgba(99, 102, 241, 0.3), 0 4px 6px -2px rgba(99, 102, 241, 0.15)'; /* Indigo shadow */
+                            } else if (index === 1) {
+                                qaCard.style.transform = 'scale(1.03)';
+                                qaCard.style.boxShadow = '0 10px 15px -3px rgba(16, 185, 129, 0.3), 0 4px 6px -2px rgba(16, 185, 129, 0.15)'; /* Emerald shadow */
+                            }
+                        }
+                    }
+                }
+            };
+
+            const ctx = document.getElementById('budgetChart').getContext('2d');
+            new Chart(ctx, budgetConfig);
+
+
+            const currencyToggleButton = document.getElementById('currencyToggle');
+            currencyToggleButton.addEventListener('click', () => {
+                currentCurrency = currentCurrency === 'USD' ? 'ARS' : 'USD';
+                updateCurrencyDisplay();
+            });
+
+            // Initial display update
+            updateCurrencyDisplay();
+
+
+            const phaseTriggers = document.querySelectorAll('.phase-trigger');
+            phaseTriggers.forEach(trigger => {
+                trigger.addEventListener('click', () => {
+                    const content = trigger.nextElementSibling;
+                    if (content.style.maxHeight) {
+                        content.style.maxHeight = null;
+                    } else {
+                        document.querySelectorAll('.phase-content').forEach(c => c.style.maxHeight = null);
+                        content.style.maxHeight = content.scrollHeight + "px";
+                    }
+                });
+            });
+
+            const navLinks = document.querySelectorAll('.nav-link');
+            const sections = document.querySelectorAll('section, footer');
+
+            // Intersection Observer for fade-in animations on scroll
+            const observerOptions = {
+                root: null,
+                rootMargin: '0px',
+                threshold: 0.1
+            };
+
+            const observer = new IntersectionObserver((entries, observer) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.style.animationPlayState = 'running';
+                        observer.unobserve(entry.target); // Stop observing once animated
+                    }
+                });
+            }, observerOptions);
+
+            document.querySelectorAll('.animate-fade-in').forEach(element => {
+                element.style.animationPlayState = 'paused'; // Pause animation initially
+                observer.observe(element);
+            });
+
+            window.addEventListener('scroll', () => {
+                let current = '';
+                sections.forEach(section => {
+                    const sectionTop = section.offsetTop;
+                    // Adjust offset for sticky header
+                    const offset = section.offsetHeight / 2; // Trigger when half of the section is visible
+                    if (pageYOffset >= sectionTop - 80) { // Adjusted offset for smoother active link
+                        current = section.getAttribute('id');
+                    }
+                });
+
+                navLinks.forEach(link => {
+                    link.classList.remove('text-blue-400', 'font-semibold');
+                    if (link.getAttribute('href').substring(1) === current) {
+                        link.classList.add('text-blue-400', 'font-semibold');
+                    }
+                });
+            });
+
+            navLinks.forEach(anchor => {
+                anchor.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    document.querySelector(this.getAttribute('href')).scrollIntoView({
+                        behavior: 'smooth'
+                    });
+                });
+            });
+        });
+    </script>
+</body>
+</html>
